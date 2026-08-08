@@ -5,9 +5,23 @@ import type { AdjustKey, PeriodKey, Quote, RealtimeStatus } from '../types/marke
 
 type WsEntry = { ws: WebSocket; callback: DatafeedSubscribeCallback }
 
+const A_SHARE_HISTORY_START = 631123200000
+const HISTORY_WINDOW_SIZE = 500
+const PERIOD_DURATION: Record<PeriodKey, number> = {
+  '1m': 60 * 1000,
+  '5m': 5 * 60 * 1000,
+  '15m': 15 * 60 * 1000,
+  '30m': 30 * 60 * 1000,
+  '60m': 60 * 60 * 1000,
+  '1d': 24 * 60 * 60 * 1000,
+  '1w': 7 * 24 * 60 * 60 * 1000,
+  '1M': 30 * 24 * 60 * 60 * 1000
+}
+
 export class AStockDatafeed implements Datafeed {
   private adjust: AdjustKey
   private readonly sockets = new Map<string, WsEntry>()
+  private readonly earliestLoaded = new Map<string, number>()
   private readonly onStatus?: (status: RealtimeStatus) => void
   private readonly onQuote?: (quote: Quote) => void
 
@@ -36,16 +50,29 @@ export class AStockDatafeed implements Datafeed {
   }
 
   async getHistoryKLineData(symbol: SymbolInfo, period: Period, from: number, to: number): Promise<KLineData[]> {
-    const response = await getKLines(symbol.ticker, periodToBackend(period), this.adjust, from, to)
-    return response.data.map((item) => ({
-      timestamp: item.timestamp,
-      open: item.open,
-      high: item.high,
-      low: item.low,
-      close: item.close,
-      volume: item.volume,
-      turnover: item.turnover
-    }))
+    const backendPeriod = periodToBackend(period)
+    const key = this.historyKey(symbol.ticker, backendPeriod)
+    const range = normalizeHistoryRange(backendPeriod, from, to, this.earliestLoaded.get(key))
+    try {
+      const response = await getKLines(symbol.ticker, backendPeriod, this.adjust, range.from, range.to)
+      const data = response.data.map((item) => ({
+        timestamp: item.timestamp,
+        open: item.open,
+        high: item.high,
+        low: item.low,
+        close: item.close,
+        volume: item.volume,
+        turnover: item.turnover
+      }))
+      this.rememberEarliest(key, data)
+      return data
+    } catch (err) {
+      this.onStatus?.({
+        state: 'reconnecting',
+        message: err instanceof Error ? err.message : '历史行情加载失败'
+      })
+      return []
+    }
   }
 
   subscribe(symbol: SymbolInfo, period: Period, callback: DatafeedSubscribeCallback): void {
@@ -91,6 +118,18 @@ export class AStockDatafeed implements Datafeed {
     for (const entry of this.sockets.values()) entry.ws.close()
     this.sockets.clear()
   }
+
+  private historyKey(symbol: string, period: PeriodKey): string {
+    return `${symbol}:${period}:${this.adjust}`
+  }
+
+  private rememberEarliest(key: string, data: KLineData[]): void {
+    const timestamps = data.map((item) => item.timestamp).filter((timestamp): timestamp is number => typeof timestamp === 'number')
+    if (!timestamps.length) return
+    const earliest = Math.min(...timestamps)
+    const previous = this.earliestLoaded.get(key)
+    if (previous === undefined || earliest < previous) this.earliestLoaded.set(key, earliest)
+  }
 }
 
 export function periodToBackend(period: Period): PeriodKey {
@@ -131,4 +170,27 @@ export function toProSymbol(symbol: { symbol: string; name: string; code: string
     pricePrecision: 2,
     volumePrecision: 0
   }
+}
+
+function normalizeHistoryRange(period: PeriodKey, rawFrom: number, rawTo: number, earliest?: number): { from: number; to: number } {
+  const duration = PERIOD_DURATION[period]
+  let from = Number.isFinite(rawFrom) ? rawFrom : 0
+  let to = Number.isFinite(rawTo) ? rawTo : 0
+  const invalidRange = from <= 0 || to <= 0 || from >= to || to < A_SHARE_HISTORY_START
+
+  if (invalidRange) {
+    to = (earliest ?? Date.now()) - duration
+    from = to - duration * HISTORY_WINDOW_SIZE
+  }
+
+  if (to <= A_SHARE_HISTORY_START) {
+    to = Date.now()
+  }
+  if (from < A_SHARE_HISTORY_START) {
+    from = A_SHARE_HISTORY_START
+  }
+  if (from >= to) {
+    from = Math.max(A_SHARE_HISTORY_START, to - duration * HISTORY_WINDOW_SIZE)
+  }
+  return { from, to }
 }

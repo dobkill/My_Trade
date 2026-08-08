@@ -14,6 +14,8 @@ interface Props {
 
 type ProInstance = InstanceType<typeof KLineChartPro>
 
+const SYNC_RETRY_DELAYS = [0, 250, 750, 1500, 3000]
+
 const chartStyles = {
   grid: {
     horizontal: { color: '#1f2937', size: 1 },
@@ -52,6 +54,8 @@ const chartStyles = {
 export function ChartPanel({ symbol, period, adjust, datafeed }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const chartRef = useRef<ProInstance | null>(null)
+  const didRunSymbolSync = useRef(false)
+  const didRunPeriodSync = useRef(false)
 
   useEffect(() => {
     if (!containerRef.current) return
@@ -72,20 +76,32 @@ export function ChartPanel({ symbol, period, adjust, datafeed }: Props) {
     })
     return () => {
       datafeed.closeAll()
-      if (containerRef.current) containerRef.current.innerHTML = ''
       chartRef.current = null
+      containerRef.current?.replaceChildren()
     }
   }, [])
 
   useEffect(() => {
-    datafeed.setAdjust(adjust)
-    chartRef.current?.setSymbol(toProSymbol(symbol))
-  }, [symbol.symbol])
+    if (!didRunSymbolSync.current) {
+      didRunSymbolSync.current = true
+      return
+    }
+    return scheduleChartSync(() => {
+      datafeed.setAdjust(adjust)
+      chartRef.current?.setSymbol(toProSymbol(symbol))
+    })
+  }, [symbol.symbol, symbol.name, symbol.code, symbol.market, adjust, datafeed])
 
   useEffect(() => {
-    datafeed.setAdjust(adjust)
-    chartRef.current?.setPeriod(periodToPro(period))
-  }, [period, adjust])
+    if (!didRunPeriodSync.current) {
+      didRunPeriodSync.current = true
+      return
+    }
+    return scheduleChartSync(() => {
+      datafeed.setAdjust(adjust)
+      chartRef.current?.setPeriod(periodToPro(period))
+    })
+  }, [period, adjust, datafeed])
 
   return (
     <section className="chart-panel">
@@ -96,4 +112,9 @@ export function ChartPanel({ symbol, period, adjust, datafeed }: Props) {
       <div ref={containerRef} className="kline-pro-host" />
     </section>
   )
+}
+
+function scheduleChartSync(sync: () => void): () => void {
+  const timers = SYNC_RETRY_DELAYS.map((delay) => window.setTimeout(sync, delay))
+  return () => timers.forEach((timer) => window.clearTimeout(timer))
 }

@@ -61,6 +61,12 @@ Swagger:  http://127.0.0.1:8000/docs
 ./scripts/start_frontend.sh
 ```
 
+一键关闭前后端：
+
+```bash
+./scripts/stop_dev.sh
+```
+
 ## API
 
 ```text

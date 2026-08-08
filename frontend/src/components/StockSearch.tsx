@@ -4,9 +4,11 @@ import type { StockSymbol } from '../types/market'
 
 interface Props {
   onSelect: (symbol: StockSymbol) => void
+  onAdd: (symbol: StockSymbol) => void
+  isWatched: (symbol: string) => boolean
 }
 
-export function StockSearch({ onSelect }: Props) {
+export function StockSearch({ onSelect, onAdd, isWatched }: Props) {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<StockSymbol[]>([])
   const [isPending, startTransition] = useTransition()
@@ -43,21 +45,40 @@ export function StockSearch({ onSelect }: Props) {
       {(results.length > 0 || error) && (
         <div className="search-results">
           {error ? <div className="search-error">{error}</div> : null}
-          {results.map((item) => (
-            <button
-              key={item.symbol}
-              type="button"
-              onClick={() => {
-                onSelect(item)
-                setQuery('')
-                setResults([])
-              }}
-            >
-              <strong>{item.code}</strong>
-              <span>{item.name}</span>
-              <small>{item.market}</small>
-            </button>
-          ))}
+          {results.map((item) => {
+            const watched = isWatched(item.symbol)
+            return (
+              <div key={item.symbol} className="search-result-row">
+                <button
+                  className="search-result-main"
+                  type="button"
+                  onClick={() => {
+                    onSelect(item)
+                    setQuery('')
+                    setResults([])
+                  }}
+                >
+                  <strong>{item.code}</strong>
+                  <span>{item.name}</span>
+                  <small>{item.market}</small>
+                </button>
+                <button
+                  className="search-result-add"
+                  type="button"
+                  title={watched ? '已在自选' : '加入自选'}
+                  disabled={watched}
+                  onClick={() => {
+                    onAdd(item)
+                    onSelect(item)
+                    setQuery('')
+                    setResults([])
+                  }}
+                >
+                  {watched ? '已' : '+'}
+                </button>
+              </div>
+            )
+          })}
         </div>
       )}
     </div>

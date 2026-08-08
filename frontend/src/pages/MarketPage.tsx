@@ -21,6 +21,7 @@ export function MarketPage() {
   const [error, setError] = useState('')
   const [realtime, setRealtime] = useState<RealtimeStatus>({ state: 'reconnecting' })
   const datafeed = useMemo(() => new AStockDatafeed(adjust, setRealtime, setQuote), [])
+  const activeInWatchList = watchList.some((item) => item.symbol === active.symbol)
 
   useEffect(() => {
     getHealth().then(setHealth).catch((err) => setError(err instanceof Error ? err.message : '后端健康检查失败'))
@@ -46,24 +47,41 @@ export function MarketPage() {
 
   const selectSymbol = (symbol: StockSymbol) => {
     setActive(symbol)
+    setError('')
+  }
+
+  const addSymbol = (symbol: StockSymbol) => {
     add(symbol)
     setError('')
+  }
+
+  const removeSymbol = (symbol: string) => {
+    remove(symbol)
+    if (symbol === active.symbol) {
+      const next = watchList.find((item) => item.symbol !== symbol)
+      if (next) setActive(next)
+    }
   }
 
   return (
     <main className="market-page">
       <header className="top-bar">
         <div className="brand">A-Trade</div>
-        <StockSearch onSelect={selectSymbol} />
+        <StockSearch onSelect={selectSymbol} onAdd={addSymbol} isWatched={(symbol) => watchList.some((item) => item.symbol === symbol)} />
         <ConnectionStatus health={health} realtime={realtime} />
         <button className="theme-toggle" type="button">深色</button>
       </header>
       <div className="terminal-layout">
-        <WatchList items={watchList} active={active.symbol} onSelect={setActive} onRemove={remove} />
+        <WatchList items={watchList} active={active.symbol} onSelect={selectSymbol} onRemove={removeSymbol} />
         <section className="workspace">
           <QuoteHeader symbol={active} quote={quote} />
           <div className="workspace-actions">
             <PeriodToolbar period={period} adjust={adjust} onPeriod={setPeriod} onAdjust={setAdjust} />
+            {!activeInWatchList ? (
+              <button className="watch-action" type="button" onClick={() => addSymbol(active)}>
+                + 加自选
+              </button>
+            ) : null}
             <ExportButton symbol={active.symbol} period={period} adjust={adjust} />
           </div>
           {error ? <div className="error-banner">{error}</div> : null}
