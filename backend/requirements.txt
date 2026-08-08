@@ -1,0 +1,14 @@
+fastapi
+uvicorn[standard]
+pydantic
+pydantic-settings
+pandas
+pyarrow
+akshare
+eltdx
+httpx
+aiofiles
+python-dateutil
+pytest
+pytest-asyncio
+websockets
