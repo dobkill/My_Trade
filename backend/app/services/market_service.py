@@ -29,6 +29,12 @@ class MarketService:
     async def get_quote(self, symbol: str) -> dict[str, Any]:
         return await self.manager.get_quote(symbol)
 
+    async def get_order_book(self, symbol: str) -> dict[str, Any]:
+        return await self.manager.get_order_book(symbol)
+
+    async def get_ticks(self, symbol: str) -> list[dict[str, Any]]:
+        return await self.manager.get_ticks(symbol)
+
     async def get_klines(
         self,
         symbol: str,

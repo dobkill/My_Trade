@@ -1,4 +1,4 @@
-import type { AdjustKey, ExportProfile, HealthResponse, KLineResponse, PeriodKey, Quote, StockSymbol } from '../types/market'
+import type { AdjustKey, ExportProfile, HealthResponse, KLineResponse, OrderBook, PeriodKey, Quote, StockSymbol, TicksResponse } from '../types/market'
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://127.0.0.1:8000'
 
@@ -32,6 +32,14 @@ export async function searchSymbols(q: string): Promise<StockSymbol[]> {
 
 export async function getQuote(symbol: string): Promise<Quote> {
   return request<Quote>(`/api/stocks/${encodeURIComponent(symbol)}/quote`)
+}
+
+export async function getOrderBook(symbol: string): Promise<OrderBook> {
+  return request<OrderBook>(`/api/stocks/${encodeURIComponent(symbol)}/order_book`)
+}
+
+export async function getTicks(symbol: string): Promise<TicksResponse> {
+  return request<TicksResponse>(`/api/stocks/${encodeURIComponent(symbol)}/ticks`)
 }
 
 export async function getKLines(

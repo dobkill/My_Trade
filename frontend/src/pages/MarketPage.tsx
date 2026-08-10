@@ -1,20 +1,27 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { getHealth, getQuote } from '../api/marketApi'
 import { AStockDatafeed } from '../datafeed/AStockDatafeed'
 import { ChartPanel } from '../components/ChartPanel'
+import { TimeSharingPanel } from '../components/TimeSharingPanel'
+import { TickTable } from '../components/TickTable'
 import { ConnectionStatus } from '../components/ConnectionStatus'
 import { ExportButton } from '../components/ExportButton'
 import { PeriodToolbar } from '../components/PeriodToolbar'
 import { QuoteHeader } from '../components/QuoteHeader'
 import { StockSearch } from '../components/StockSearch'
 import { WatchList } from '../components/WatchList'
+import { useHotkeys } from '../hooks/useHotkeys'
+import { useTheme } from '../hooks/useTheme'
 import { useWatchList } from '../hooks/useWatchList'
+import { useWatchQuotes } from '../hooks/useWatchQuotes'
 import type { AdjustKey, HealthResponse, PeriodKey, Quote, RealtimeStatus, StockSymbol } from '../types/market'
 
 export function MarketPage() {
+  const { theme, toggle: toggleTheme } = useTheme()
   const { watchList, add, remove } = useWatchList()
+  const quotes = useWatchQuotes(watchList)
   const [active, setActive] = useState<StockSymbol>(watchList[0])
-  const [period, setPeriod] = useState<PeriodKey>('1d')
+  const [period, setPeriod] = useState<PeriodKey | 'time'>('1d')
   const [adjust, setAdjust] = useState<AdjustKey>('qfq')
   const [quote, setQuote] = useState<Quote | null>(null)
   const [health, setHealth] = useState<HealthResponse | null>(null)
@@ -22,6 +29,15 @@ export function MarketPage() {
   const [realtime, setRealtime] = useState<RealtimeStatus>({ state: 'reconnecting' })
   const datafeed = useMemo(() => new AStockDatafeed(adjust, setRealtime, setQuote), [])
   const activeInWatchList = watchList.some((item) => item.symbol === active.symbol)
+
+  // 删除画线函数由 ChartPanel 注册，键盘 Delete 时调用
+  const deleteOverlayRef = useRef<(() => void) | null>(null)
+  const registerDeleteOverlay = useCallback((fn: (() => void) | null) => {
+    deleteOverlayRef.current = fn
+  }, [])
+  const handleDeleteOverlay = useCallback(() => {
+    deleteOverlayRef.current?.()
+  }, [])
 
   useEffect(() => {
     getHealth().then(setHealth).catch((err) => setError(err instanceof Error ? err.message : '后端健康检查失败'))
@@ -50,6 +66,8 @@ export function MarketPage() {
     setError('')
   }
 
+  useHotkeys({ watchList, active, onSelect: selectSymbol, onDeleteOverlay: handleDeleteOverlay })
+
   const addSymbol = (symbol: StockSymbol) => {
     add(symbol)
     setError('')
@@ -69,10 +87,18 @@ export function MarketPage() {
         <div className="brand">A-Trade</div>
         <StockSearch onSelect={selectSymbol} onAdd={addSymbol} isWatched={(symbol) => watchList.some((item) => item.symbol === symbol)} />
         <ConnectionStatus health={health} realtime={realtime} />
-        <button className="theme-toggle" type="button">深色</button>
+        <button className="theme-toggle" type="button" onClick={toggleTheme} title="切换深色/浅色主题">
+          {theme === 'dark' ? '🌙 深色' : '☀️ 浅色'}
+        </button>
       </header>
       <div className="terminal-layout">
-        <WatchList items={watchList} active={active.symbol} onSelect={selectSymbol} onRemove={removeSymbol} />
+        <WatchList
+          items={watchList}
+          quotes={quotes}
+          active={active.symbol}
+          onSelect={selectSymbol}
+          onRemove={removeSymbol}
+        />
         <section className="workspace">
           <QuoteHeader symbol={active} quote={quote} />
           <div className="workspace-actions">
@@ -82,10 +108,30 @@ export function MarketPage() {
                 + 加自选
               </button>
             ) : null}
-            <ExportButton symbol={active.symbol} period={period} adjust={adjust} />
+            <ExportButton symbol={active.symbol} period={period === 'time' ? '1d' : period} adjust={adjust} />
           </div>
           {error ? <div className="error-banner">{error}</div> : null}
-          <ChartPanel symbol={active} period={period} adjust={adjust} datafeed={datafeed} />
+          {period === 'time' ? (
+            <TimeSharingPanel
+              symbolCode={active.code}
+              symbol={active.symbol}
+              name={active.name}
+              adjust={adjust}
+              theme={theme}
+              preClose={quote?.pre_close}
+            />
+          ) : (
+            <ChartPanel
+              symbol={active}
+              period={period}
+              adjust={adjust}
+              theme={theme}
+              datafeed={datafeed}
+              lastPrice={quote?.price}
+              registerDeleteOverlay={registerDeleteOverlay}
+            />
+          )}
+          <TickTable symbol={active.symbol} preClose={quote?.pre_close} />
         </section>
       </div>
     </main>

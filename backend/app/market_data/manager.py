@@ -69,6 +69,39 @@ class MarketDataManager:
     async def get_realtime_quote(self, symbol: str) -> dict[str, Any]:
         return await self.get_quote(symbol)
 
+    async def get_order_book(self, symbol: str) -> dict[str, Any]:
+        canonical = canonical_symbol(symbol)
+        errors: list[str] = []
+        for provider in self.providers:
+            try:
+                book = await provider.get_order_book(canonical)
+                book["source"] = provider.name
+                return book
+            except NotImplementedError:
+                errors.append(f"{provider.name}: unsupported")
+                continue
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("provider=%s symbol=%s action=order_book fallback=true error=%s", provider.name, canonical, exc)
+                errors.append(f"{provider.name}: {exc}")
+        raise MarketDataError("; ".join(errors) or "order book unavailable", "manager")
+
+    async def get_ticks(self, symbol: str) -> list[dict[str, Any]]:
+        canonical = canonical_symbol(symbol)
+        errors: list[str] = []
+        for provider in self.providers:
+            try:
+                ticks = await provider.get_ticks(canonical)
+                for item in ticks:
+                    item["source"] = provider.name
+                return ticks
+            except NotImplementedError:
+                errors.append(f"{provider.name}: unsupported")
+                continue
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("provider=%s symbol=%s action=ticks fallback=true error=%s", provider.name, canonical, exc)
+                errors.append(f"{provider.name}: {exc}")
+        raise MarketDataError("; ".join(errors) or "ticks unavailable", "manager")
+
     async def get_history(
         self,
         symbol: str,

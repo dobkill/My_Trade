@@ -56,3 +56,30 @@ export interface RealtimeStatus {
   provider?: string
   message?: string
 }
+
+export interface OrderBookLevel {
+  price?: number | null
+  volume?: number | null
+}
+
+export interface OrderBook {
+  symbol: string
+  bids: OrderBookLevel[]
+  asks: OrderBookLevel[]
+  timestamp: number
+  source: string
+}
+
+export interface Tick {
+  timestamp: number
+  price: number
+  volume?: number | null
+  amount?: number | null
+  type?: string
+  source?: string
+}
+
+export interface TicksResponse {
+  symbol: string
+  data: Tick[]
+}

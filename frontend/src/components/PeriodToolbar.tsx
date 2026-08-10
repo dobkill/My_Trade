@@ -1,13 +1,14 @@
 import type { AdjustKey, PeriodKey } from '../types/market'
 
 interface Props {
-  period: PeriodKey
+  period: PeriodKey | 'time'
   adjust: AdjustKey
-  onPeriod: (period: PeriodKey) => void
+  onPeriod: (period: PeriodKey | 'time') => void
   onAdjust: (adjust: AdjustKey) => void
 }
 
-const periods: Array<{ key: PeriodKey; label: string }> = [
+const periods: Array<{ key: PeriodKey | 'time'; label: string }> = [
+  { key: 'time', label: '分时' },
   { key: '1m', label: '1m' },
   { key: '5m', label: '5m' },
   { key: '15m', label: '15m' },

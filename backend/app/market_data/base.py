@@ -52,3 +52,11 @@ class MarketDataProvider(ABC):
     @abstractmethod
     async def get_realtime_quote(self, symbol: str) -> dict[str, Any]:
         raise NotImplementedError
+
+    async def get_order_book(self, symbol: str) -> dict[str, Any]:
+        """五档买卖盘。默认未实现，由支持的 provider 覆写。"""
+        raise NotImplementedError
+
+    async def get_ticks(self, symbol: str) -> list[dict[str, Any]]:
+        """当日逐笔成交明细。默认未实现，由支持的 provider 覆写。"""
+        raise NotImplementedError
