@@ -1,4 +1,4 @@
-import type { AdjustKey, HealthResponse, KLineResponse, PeriodKey, Quote, StockSymbol } from '../types/market'
+import type { AdjustKey, ExportProfile, HealthResponse, KLineResponse, PeriodKey, Quote, StockSymbol } from '../types/market'
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://127.0.0.1:8000'
 
@@ -47,7 +47,15 @@ export async function getKLines(
   return request<KLineResponse>(`/api/stocks/${encodeURIComponent(symbol)}/klines?${params.toString()}`)
 }
 
-export function exportUrl(symbol: string, period: PeriodKey, adjust: AdjustKey, format: 'csv' | 'parquet'): string {
-  const params = new URLSearchParams({ period, adjust, format })
+interface ExportOptions {
+  profile?: ExportProfile
+  startDate?: string
+  endDate?: string
+}
+
+export function exportUrl(symbol: string, period: PeriodKey, adjust: AdjustKey, format: 'csv' | 'parquet', options: ExportOptions = {}): string {
+  const params = new URLSearchParams({ period, adjust, format, profile: options.profile ?? 'raw' })
+  if (options.startDate) params.set('start', `${options.startDate}T00:00:00+08:00`)
+  if (options.endDate) params.set('end', `${options.endDate}T23:59:59+08:00`)
   return `${apiBaseUrl()}/api/stocks/${encodeURIComponent(symbol)}/export?${params.toString()}`
 }

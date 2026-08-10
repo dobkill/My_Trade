@@ -5,7 +5,6 @@ from fastapi.responses import FileResponse
 
 from app.api.deps import get_export_service
 from app.services.export_service import ExportService
-from app.utils.symbols import canonical_symbol, normalize_adjust, normalize_period
 
 router = APIRouter(prefix="/stocks", tags=["export"])
 
@@ -18,11 +17,9 @@ async def export_history(
     start: str | None = Query(default=None),
     end: str | None = Query(default=None),
     adjust: str = Query(default="none"),
+    profile: str = Query(default="raw", pattern="^(raw|ai)$"),
     service: ExportService = Depends(get_export_service),
 ):
-    path = await service.export(symbol, period, format, start=start, end=end, adjust=adjust)
-    canonical = canonical_symbol(symbol)
-    norm_period = normalize_period(period)
-    norm_adjust = normalize_adjust(adjust)
+    path = await service.export(symbol, period, format, start=start, end=end, adjust=adjust, profile=profile)
     media_type = "text/csv" if format == "csv" else "application/octet-stream"
-    return FileResponse(path, media_type=media_type, filename=f"{canonical}_{norm_period}_{norm_adjust}.{format}")
+    return FileResponse(path, media_type=media_type, filename=path.name)

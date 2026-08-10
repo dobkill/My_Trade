@@ -74,8 +74,9 @@ GET /api/health
 GET /api/symbols/search?q=茅台
 GET /api/stocks/{symbol}/quote
 GET /api/stocks/{symbol}/klines?period=1d&start=&end=&adjust=qfq
-GET /api/stocks/{symbol}/export?period=1d&adjust=qfq&format=csv
-GET /api/stocks/{symbol}/export?period=1d&adjust=qfq&format=parquet
+GET /api/stocks/{symbol}/export?period=1d&adjust=qfq&format=csv&profile=raw&start=&end=
+GET /api/stocks/{symbol}/export?period=1d&adjust=qfq&format=csv&profile=ai&start=&end=
+GET /api/stocks/{symbol}/export?period=1d&adjust=qfq&format=parquet&profile=raw&start=&end=
 WS  /ws/stocks/{symbol}
 ```
 
@@ -118,6 +119,22 @@ volume, turnover, period, adjust, source
 ```
 
 写入时会排序、去重并 merge/upsert，避免重复保存相同 K 线。
+
+CSV 导出支持两种 profile：
+
+```text
+raw  原始 K 线字段，适合存档、回放和人工复查
+ai   AI 数据集字段，适合训练和推理，只支持 CSV
+```
+
+AI CSV 会保留原始 K 线，并增加 `feature_*`、`target_*`、`bar_index`、`schema_version` 和 `is_trainable`。`is_trainable=1` 表示该行已经同时具备滚动特征和未来标签；末尾没有未来标签的行会保留为 `is_trainable=0`，可用于推理输入。
+
+导出可传 `start` / `end`，前端日期选择会按上海时区发送整天范围，例如：
+
+```text
+start=2026-01-01T00:00:00+08:00
+end=2026-08-07T23:59:59+08:00
+```
 
 ## Provider
 

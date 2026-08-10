@@ -65,21 +65,63 @@ class ParquetStore:
             frame = frame[frame["timestamp"] <= end_ms]
         return self._clean(frame).reset_index(drop=True)
 
-    def export_csv(self, df: pd.DataFrame, symbol: str, period: str, adjust: str) -> Path:
+    def export_csv(
+        self,
+        df: pd.DataFrame,
+        symbol: str,
+        period: str,
+        adjust: str,
+        *,
+        profile: str = "raw",
+        start_label: str | None = None,
+        end_label: str | None = None,
+        clean: bool = True,
+    ) -> Path:
         canonical = canonical_symbol(symbol)
         norm_period = normalize_period(period)
         norm_adjust = normalize_adjust(adjust)
-        path = self.csv_dir / f"{canonical}_{norm_period}_{norm_adjust}.csv"
-        self._clean(df).to_csv(path, index=False)
+        path = self.csv_dir / self._export_filename(canonical, norm_period, norm_adjust, profile, "csv", start_label, end_label)
+        frame = self._clean(df) if clean else df.copy()
+        frame.to_csv(path, index=False)
         return path
 
-    def export_parquet(self, df: pd.DataFrame, symbol: str, period: str, adjust: str) -> Path:
+    def export_parquet(
+        self,
+        df: pd.DataFrame,
+        symbol: str,
+        period: str,
+        adjust: str,
+        *,
+        profile: str = "raw",
+        start_label: str | None = None,
+        end_label: str | None = None,
+    ) -> Path:
         canonical = canonical_symbol(symbol)
         norm_period = normalize_period(period)
         norm_adjust = normalize_adjust(adjust)
-        path = self.parquet_dir / f"{canonical}_{norm_period}_{norm_adjust}.parquet"
+        path = self.parquet_dir / self._export_filename(canonical, norm_period, norm_adjust, profile, "parquet", start_label, end_label)
         self._clean(df).to_parquet(path, index=False)
         return path
+
+    def clean_bars(self, df: pd.DataFrame) -> pd.DataFrame:
+        return self._clean(df)
+
+    def _export_filename(
+        self,
+        symbol: str,
+        period: str,
+        adjust: str,
+        profile: str,
+        extension: str,
+        start_label: str | None,
+        end_label: str | None,
+    ) -> str:
+        parts = [symbol, period, adjust]
+        if profile != "raw" or start_label or end_label:
+            parts.append(profile)
+        if start_label or end_label:
+            parts.extend([start_label or "start", end_label or "end"])
+        return f"{'_'.join(parts)}.{extension}"
 
     def _split_by_path(self, df: pd.DataFrame) -> list[tuple[Path, pd.DataFrame]]:
         result: list[tuple[Path, pd.DataFrame]] = []

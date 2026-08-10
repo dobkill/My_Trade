@@ -1,5 +1,6 @@
 export type PeriodKey = '1m' | '5m' | '15m' | '30m' | '60m' | '1d' | '1w' | '1M'
 export type AdjustKey = 'none' | 'qfq' | 'hfq'
+export type ExportProfile = 'raw' | 'ai'
 
 export interface StockSymbol {
   symbol: string
